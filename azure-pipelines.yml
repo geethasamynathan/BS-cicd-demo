@@ -1,15 +1,56 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
-- main
-
+  branches:
+    include: [main]
+pr:
+  branches:
+    include: [main]
 pool:
   vmImage: ubuntu-latest
-
-steps:
-- script: echo "Welcome to Azure Devops"
-  displayName: 'Print welcome message'
-
+stages:
+  - stage: CI
+    displayName: Continuous Integration
+    jobs:
+      - job: Build
+        steps:
+          - checkout: self
+          - script: |
+              set -e
+              test -s index.html
+              test -s style.css
+              test -s script.js
+            displayName: Validate application files
+          - script: node --check script.js
+            displayName: Validate JavaScript syntax
+          - script: |
+              set -e
+              mkdir -p "$(Build.ArtifactStagingDirectory)/website"
+              cp index.html style.css script.js "$(Build.ArtifactStagingDirectory)/website/"
+            displayName: Prepare deployment files
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/website'
+              artifact: website
+              publishLocation: pipeline
+  - stage: CD
+    displayName: Continuous Deployment
+    dependsOn: CI
+    condition: |
+      and(succeeded(),
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: Deploy
+        steps:
+          - checkout: none
+          - download: current
+            artifact: website
+          - task: AzureStaticWebApp@0
+            displayName: Deploy website to Azure
+            inputs:
+              cwd: '$(Pipeline.Workspace)/website'
+              app_location: '/'
+              api_location: ''
+              output_location: ''
+              skip_app_build: true
+              skip_api_build: true
+              azure_static_web_apps_api_token: $(swa_deployment_token)
