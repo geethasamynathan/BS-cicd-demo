@@ -1,3 +1,4 @@
 function showMessage() {
-   let message=;
+   let message= "Build Pipeline is working fine. Application is deployed successfully."
+
 }
