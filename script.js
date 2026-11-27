@@ -1,5 +1,5 @@
 function getMessage() {
-   return "Build Pipeline is working fine. Application is deployed successfully."
+   return "Application  deployment failed."
 }
 
 function showMessage() { 
