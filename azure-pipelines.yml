@@ -1,49 +1,86 @@
+
 trigger:
   branches:
     include: [main]
+
 pr:
   branches:
     include: [main]
+
 pool:
   vmImage: ubuntu-latest
+
 stages:
+
+  # =====================================
+  # Stage 1 - Continuous Integration
+  # =====================================
+
   - stage: CI
     displayName: Continuous Integration
+
     jobs:
       - job: Build
         steps:
+
           - checkout: self
+
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '22.x'
+            displayName: Setup Node.js
+
           - script: |
               set -e
               test -s index.html
               test -s style.css
               test -s script.js
+              test -s script.test.js
             displayName: Validate application files
+
           - script: node --check script.js
             displayName: Validate JavaScript syntax
+
+          # NEW - Automated Unit Testing
+
+          - script: node --test script.test.js
+            displayName: Run JavaScript Unit Tests
+
           - script: |
               set -e
               mkdir -p "$(Build.ArtifactStagingDirectory)/website"
               cp index.html style.css script.js "$(Build.ArtifactStagingDirectory)/website/"
             displayName: Prepare deployment files
+
           - task: PublishPipelineArtifact@1
+            displayName: Publish Website Artifact
             inputs:
               targetPath: '$(Build.ArtifactStagingDirectory)/website'
               artifact: website
               publishLocation: pipeline
+
+  # =====================================
+  # Stage 2 - Continuous Deployment
+  # =====================================
+
   - stage: CD
     displayName: Continuous Deployment
     dependsOn: CI
+
     condition: |
       and(succeeded(),
           eq(variables['Build.SourceBranch'], 'refs/heads/main'),
           ne(variables['Build.Reason'], 'PullRequest'))
+
     jobs:
       - job: Deploy
         steps:
+
           - checkout: none
+
           - download: current
             artifact: website
+
           - task: AzureStaticWebApp@0
             displayName: Deploy website to Azure
             inputs:
